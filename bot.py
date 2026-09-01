@@ -35,15 +35,11 @@ def generate_image(nomor_formatted):
     draw = ImageDraw.Draw(img)
     UKURAN_FONT = 52
 
+    # Memuat font lokal font.ttf agar posisi presisi di Railway & Termux
     try:
         font = ImageFont.truetype("font.ttf", UKURAN_FONT)
     except IOError:
-        try:
-            font = ImageFont.truetype(
-                "/system/fonts/Roboto-BoldItalic.ttf", UKURAN_FONT
-            )
-        except IOError:
-            font = ImageFont.load_default()
+        font = ImageFont.load_default()
 
     posisi_x = 1295
     posisi_y = 720
@@ -80,7 +76,6 @@ async def process_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         image_path = generate_image(nomor_hasil)
 
-        # Tombol interaktif yang sudah diperbaiki
         keyboard = [
             [InlineKeyboardButton("Input Nomor Lain", callback_data="reset")]
         ]
