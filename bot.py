@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from PIL import Image, ImageDraw, ImageFont
@@ -35,7 +36,6 @@ def generate_image(nomor_formatted):
     draw = ImageDraw.Draw(img)
     UKURAN_FONT = 52
 
-    # Memuat font lokal font.ttf agar posisi presisi di Railway & Termux
     try:
         font = ImageFont.truetype("font.ttf", UKURAN_FONT)
     except IOError:
@@ -66,18 +66,41 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
-    nomor_hasil = format_nomor(user_text)
 
+    # 1. Pesan Awal Loading
     status_msg = await update.message.reply_text(
-        f"<b>PROCESSING DATA...</b>\nNomor: <code>{nomor_hasil}</code>",
+        "<b>[■□□□□□□□□□] 10%</b>\n<i>Validasi format nomor...</i>",
         parse_mode=ParseMode.HTML,
     )
+    await asyncio.sleep(0.4)
+
+    nomor_hasil = format_nomor(user_text)
+
+    # 2. Loading Tahap 2
+    await status_msg.edit_text(
+        f"<b>[■■■■■□□□□□] 50%</b>\n<i>Menempelkan nomor <code>{nomor_hasil}</code> ke template...</i>",
+        parse_mode=ParseMode.HTML,
+    )
+    await asyncio.sleep(0.4)
 
     try:
         image_path = generate_image(nomor_hasil)
 
+        # 3. Loading Tahap 3
+        await status_msg.edit_text(
+            "<b>[■■■■■■■■■■] 100%</b>\n<i>Menyelesaikan rendering gambar...</i>",
+            parse_mode=ParseMode.HTML,
+        )
+        await asyncio.sleep(0.3)
+
+        # Tombol Interaktif: Input Lagi & Hapus
         keyboard = [
-            [InlineKeyboardButton("Input Nomor Lain", callback_data="reset")]
+            [
+                InlineKeyboardButton(
+                    "🔄 Input Nomor Lain", callback_data="reset"
+                ),
+                InlineKeyboardButton("🗑️ Hapus Pesan", callback_data="delete"),
+            ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -96,6 +119,7 @@ async def process_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup,
         )
 
+        # Hapus pesan status loading setelah selesai
         await status_msg.delete()
 
     except Exception as e:
@@ -105,10 +129,14 @@ async def process_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
     if query.data == "reset":
         await query.message.reply_text(
             "<b>Silakan masukkan nomor baru:</b>", parse_mode=ParseMode.HTML
         )
+    elif query.data == "delete":
+        # Menghapus pesan foto saat tombol Hapus Pesan diklik
+        await query.message.delete()
 
 
 if __name__ == "__main__":
