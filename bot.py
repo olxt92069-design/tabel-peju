@@ -37,7 +37,7 @@ def generate_image_bytes(nomor_formatted):
     # Membuka template dan menggambar teks
     img = Image.open("template.png")
     draw = ImageDraw.Draw(img)
-    UKURAN_FONT = 56
+    UKURAN_FONT = 58
 
     try:
         font = ImageFont.truetype("font.ttf", UKURAN_FONT)
