@@ -1,4 +1,5 @@
 import asyncio
+import io
 import logging
 import re
 from PIL import Image, ImageDraw, ImageFont
@@ -13,6 +14,7 @@ from telegram.ext import (
     filters,
 )
 
+# Masukkan Token Bot Telegram Kamu
 TOKEN = "8834039237:AAGheXsBM3miEmAXnd9f_mJbtl6vJBkBjZo"
 
 logging.basicConfig(
@@ -31,14 +33,15 @@ def format_nomor(nomor_raw):
     return angka
 
 
-def generate_image(nomor_formatted):
+def generate_image_bytes(nomor_formatted):
+    # Membuka template dan menggambar teks
     img = Image.open("template.png")
     draw = ImageDraw.Draw(img)
     UKURAN_FONT = 52
 
     try:
         font = ImageFont.truetype("font.ttf", UKURAN_FONT)
-    except IOError:
+    except Exception:
         font = ImageFont.load_default()
 
     posisi_x = 1295
@@ -49,9 +52,12 @@ def generate_image(nomor_formatted):
         (posisi_x, posisi_y), nomor_formatted, fill=warna_teks, font=font
     )
 
-    output_path = "output.png"
-    img.save(output_path)
-    return output_path
+    # Simpan ke memory buffer (RAM) agar aman & cepat di server Railway
+    bio = io.BytesIO()
+    bio.name = "output.png"
+    img.save(bio, "PNG")
+    bio.seek(0)
+    return bio
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -67,33 +73,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
 
-    # 1. Pesan Awal Loading
+    # 1. Loading Step 1
     status_msg = await update.message.reply_text(
         "<b>[■□□□□□□□□□] 10%</b>\n<i>Validasi format nomor...</i>",
         parse_mode=ParseMode.HTML,
     )
-    await asyncio.sleep(0.4)
 
     nomor_hasil = format_nomor(user_text)
+    await asyncio.sleep(0.3)
 
-    # 2. Loading Tahap 2
+    # 2. Loading Step 2
     await status_msg.edit_text(
         f"<b>[■■■■■□□□□□] 50%</b>\n<i>Menempelkan nomor <code>{nomor_hasil}</code> ke template...</i>",
         parse_mode=ParseMode.HTML,
     )
-    await asyncio.sleep(0.4)
 
     try:
-        image_path = generate_image(nomor_hasil)
+        # Generate gambar langsung via memory BytesIO
+        image_bytes = generate_image_bytes(nomor_hasil)
+        await asyncio.sleep(0.3)
 
-        # 3. Loading Tahap 3
+        # 3. Loading Step 3
         await status_msg.edit_text(
             "<b>[■■■■■■■■■■] 100%</b>\n<i>Menyelesaikan rendering gambar...</i>",
             parse_mode=ParseMode.HTML,
         )
-        await asyncio.sleep(0.3)
 
-        # Tombol Interaktif: Input Lagi & Hapus
         keyboard = [
             [
                 InlineKeyboardButton(
@@ -113,16 +118,16 @@ async def process_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_photo(
-            photo=open(image_path, "rb"),
+            photo=image_bytes,
             caption=caption_gambar,
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup,
         )
 
-        # Hapus pesan status loading setelah selesai
         await status_msg.delete()
 
     except Exception as e:
+        logging.error(f"Error processing image: {e}")
         await status_msg.edit_text(f"❌ <b>Gagal memproses gambar:</b> {e}")
 
 
@@ -135,7 +140,6 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<b>Silakan masukkan nomor baru:</b>", parse_mode=ParseMode.HTML
         )
     elif query.data == "delete":
-        # Menghapus pesan foto saat tombol Hapus Pesan diklik
         await query.message.delete()
 
 
